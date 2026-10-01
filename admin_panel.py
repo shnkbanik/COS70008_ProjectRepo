@@ -7,6 +7,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from datetime import datetime
+import database
 
 class AdminPanel(tk.Frame):
 
@@ -18,6 +19,10 @@ class AdminPanel(tk.Frame):
         self.on_logout = on_logout
 
         self.build()
+
+        # refresh the page with updated data
+        self.refresh_dashboard()
+        self.refresh_student_list()
 
     def build(self):
         # This Frame (self) has exactly two rows:
@@ -165,7 +170,7 @@ class AdminPanel(tk.Frame):
             dashboard_box, "User Never Used:", 2)
 
         tk.Button(dashboard_box, text="Refresh",
-                  command=self.show_not_ready).grid(
+                  command=self.refresh_dashboard).grid(
             row=3, column=0, columnspan=2, pady=(10, 0))
 
         # Add New User
@@ -239,6 +244,31 @@ class AdminPanel(tk.Frame):
 
         return value_label
 
+    def refresh_dashboard(self):
+            """
+            Asks the database for the latest three numbers and updates
+            the labels on screen.
+            """
+            total_registered, active_today, never_used = database.get_dashboard_counts()
+
+            self.registered_label.configure(text=str(total_registered))
+            self.active_label.configure(text=str(active_today))
+            self.never_used_label.configure(text=str(never_used))
+
+        # NEW: Load students from database into the email recipient list
+        # NEW: Load students from database into the email recipient list
+
+    def refresh_student_list(self):
+        """
+        Clears and refills the "To" list box with every student
+        currently in the database.
+        """
+        self.student_listbox.delete(0, tk.END)
+
+        students = database.get_all_students()
+
+        for user_id, email in students:
+            self.student_listbox.insert(tk.END, f"{user_id} - {email}")
 
     def select_all_students(self):
         # This selects every single row in the list box at once.
@@ -266,6 +296,8 @@ class AdminPanel(tk.Frame):
 
         # if success:
         #   messagebox.showinfo("Success", message)
+        success, message = database.add_user(user_id, email, password,
+                                             policy_type, role)
 
         # Clear the form so it is ready for the next new user.
         self.new_user_id_entry.delete(0, tk.END)
@@ -274,10 +306,10 @@ class AdminPanel(tk.Frame):
 
             # Update the dashboard numbers and the email list,
             # since we just added a new row to the database.
-            # self.refresh_dashboard()
-            # self.refresh_student_list()
+        self.refresh_dashboard()
+        self.refresh_student_list()
         # else:
-        #    messagebox.showerror("Could Not Add User", message)
+        messagebox.showerror("Could Not Add User", message)
 
     def show_not_ready(self):
         # A shared message for every button we have not built yet
@@ -288,6 +320,7 @@ class AdminPanel(tk.Frame):
 
 # Test Run
 if __name__ == "__main__":
+    database.create_database()
 
     def logout():
         print("Logout button was pressed.")

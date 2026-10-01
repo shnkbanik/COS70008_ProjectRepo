@@ -6,6 +6,7 @@
 
 import tkinter as tk
 from tkinter import messagebox
+# import config
 import auth_manager
 
 
@@ -84,6 +85,16 @@ class LoginPage(tk.Frame):
 # Any other ID/password will correctly show "Login Failed".
 
 if __name__ == "__main__":
+    import database
+
+    # database.create_tables()
+    database.create_database()
+    # returns success=False with an "already exists" message - we just
+    # ignore that here, since it only means they were already added.
+    database.add_user("123456", "student_demo@gmail.com", "student123",
+                      "student", "student")
+    database.add_user("654321", "admin_demo@gmail.com", "admin123",
+                      None, "admin")
 
     # Dummy ID PASS
 
