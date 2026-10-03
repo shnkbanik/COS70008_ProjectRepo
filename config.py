@@ -30,6 +30,3 @@ SEND_ON_STARTUP = False
 # Example: HOUR = 21, MINUTE = 30 means the check happens at 9:30 PM.
 DAILY_EMAIL_HOUR = 21
 DAILY_EMAIL_MINUTE = 0
-
-# Test data
-TEST_STUDENT_EMAIL = "shounakbnagad@gmail.com"
