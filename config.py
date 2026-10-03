@@ -8,7 +8,7 @@ APP_TITLE = "Medibank AI-Chatbot"
 # Database Settings
 # Name of SQLite database file.
 # SQLite stores data of Student and Admin in a file in local PC.
-DB_FILE_NAME = "medibank_users.db"
+DB_FILE_NAME = "medibank.db"
 
 # Email Settings (used later by smtplib to send emails)
 # Sender (Admin) Email address for sending notification

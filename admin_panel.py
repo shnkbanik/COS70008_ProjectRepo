@@ -8,18 +8,16 @@ import tkinter as tk
 from tkinter import messagebox
 from datetime import datetime
 import database
+import config
+import email_manager
 
 class AdminPanel(tk.Frame):
 
     def __init__(self, master, on_logout):
         super().__init__(master, bg="white")
-
-
         # call when the admin clicks "Logout".
         self.on_logout = on_logout
-
         self.build()
-
         # refresh the page with updated data
         self.refresh_dashboard()
         self.refresh_student_list()
@@ -43,12 +41,7 @@ class AdminPanel(tk.Frame):
                   font=("Arial", 10),
                   command=self.on_logout).pack(side="right", padx=10, pady=8)
 
-        # ---------- Scrollable area ----------
-        # A Canvas is the only widget in Tkinter that can scroll, so we
-        # put a Canvas here, and a Scrollbar next to it. Then all three
-        # sections below (Bulk Email, Dashboard, Add New User) go
-        # inside a plain Frame called "body", and "body" sits inside
-        # the Canvas.
+        # Scrollable area
         scroll_area = tk.Frame(self, bg="white")
         scroll_area.grid(row=1, column=0, sticky="nsew")
         scroll_area.rowconfigure(0, weight=1)
@@ -67,28 +60,16 @@ class AdminPanel(tk.Frame):
         body_id = canvas.create_window((0, 0), window=body, anchor="nw")
 
         def on_body_resize(event):
-            # Tells the canvas how tall the scrollable area really is,
-            # every time the content inside it changes size.
             canvas.configure(scrollregion=canvas.bbox("all"))
         body.bind("<Configure>", on_body_resize)
 
         def on_canvas_resize(event):
-            # Makes the body frame always match the canvas width, so
-            # the sections stretch to fill the window instead of
-            # staying a fixed narrow width.
             canvas.itemconfig(body_id, width=event.width)
         canvas.bind("<Configure>", on_canvas_resize)
 
         def on_mousewheel(event):
-            # Lets the mouse scroll wheel work over the canvas.
-            # event.delta is 120 (or a multiple of it) on Windows and
-            # Mac, so dividing by 120 gives a small, steady scroll
-            # step on both.
             canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-        # We only turn on scrolling with the mouse wheel while the
-        # mouse is actually over this screen, so it does not interfere
-        # with any other window.
         canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", on_mousewheel))
         canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
@@ -113,7 +94,7 @@ class AdminPanel(tk.Frame):
         tk.Label(from_row, text="From:", font=("Arial", 10),
                  bg="white", width=8, anchor="w").pack(side="left")
         from_entry = tk.Entry(from_row, font=("Arial", 10))
-        from_entry.insert(0, "cos70008@gmail.com")
+        from_entry.insert(0, config.SENDER_EMAIL)
         from_entry.configure(state="disabled")  # locked, cannot be edited
         from_entry.pack(side="left", fill="x", expand=True)
 
@@ -154,7 +135,7 @@ class AdminPanel(tk.Frame):
         # Send button
         tk.Button(email_box, text="Send",
                   font=("Arial", 10),
-                  command=self.show_not_ready).pack(anchor="e", pady=(8, 0))
+                  command=self.handle_send_bulk_email).pack(anchor="e", pady=(8, 0))
 
         # Dashboard
         dashboard_box = tk.LabelFrame(body, text="Dashboard",
@@ -230,10 +211,8 @@ class AdminPanel(tk.Frame):
 
     def make_dashboard_row(self, parent, label_text, row_number):
         """
-        This is a small helper function so we do not repeat the same
-        code three times for the three dashboard numbers.
-        It creates a label on the left and a number box on the right,
-        and returns the number box so we can update it later.
+        Create a label on the left and a number box on the right,
+        and return the number box for updating it later.
         """
         tk.Label(parent, text=label_text, font=("Arial", 11),
                  bg="white").grid(row=row_number, column=0, padx=6, pady=6, sticky="e")
@@ -256,7 +235,6 @@ class AdminPanel(tk.Frame):
             self.never_used_label.configure(text=str(never_used))
 
         # NEW: Load students from database into the email recipient list
-        # NEW: Load students from database into the email recipient list
 
     def refresh_student_list(self):
         """
@@ -265,14 +243,45 @@ class AdminPanel(tk.Frame):
         """
         self.student_listbox.delete(0, tk.END)
 
-        students = database.get_all_students()
+        self.current_student_list = database.get_all_students()
 
-        for user_id, email in students:
+        for user_id, email in self.current_student_list:
             self.student_listbox.insert(tk.END, f"{user_id} - {email}")
 
     def select_all_students(self):
         # This selects every single row in the list box at once.
         self.student_listbox.select_set(0, tk.END)
+
+    def handle_send_bulk_email(self):
+        selected_rows = self.student_listbox.curselection()
+
+        if len(selected_rows) == 0:
+            messagebox.showwarning("No Recipients",
+                                    "Please select at least one student in the To list.")
+            return
+        subject = self.subject_entry.get().strip()
+        body = self.body_text.get("1.0", tk.END).strip()
+
+        if subject == "" or body == "":
+            messagebox.showwarning("Missing Information",
+                                    "Please fill in both Subject and Body.")
+            return
+
+        # Turn the selected row numbers into real email addresses,
+        # using the list we saved earlier in refresh_student_list().
+        selected_emails = []
+        for row_number in selected_rows:
+            user_id, email = self.current_student_list[row_number]
+            selected_emails.append(email)
+        success_count, fail_count = email_manager.send_bulk_email(
+            selected_emails, subject, body)
+        messagebox.showinfo(
+            "Bulk Email Finished",
+            f"Sent: {success_count}\nFailed: {fail_count}"
+        )
+        # Clear the Subject and Body boxes, ready for the next message
+        self.subject_entry.delete(0, tk.END)
+        self.body_text.delete("1.0", tk.END)
 
     def handle_add_user(self):
         # Read everything the admin typed into the Add New User form.
@@ -288,51 +297,35 @@ class AdminPanel(tk.Frame):
                                     "Please fill in User ID, Email, and Password.")
             return
 
-        messagebox.showinfo("Success", f"User '{user_id}' was added successfully.")
+        success, message = database.add_user(user_id, email, password, policy_type, role)
 
+        if success:
+            # Send the new student welcome email automatically.
+            email_sent = True
+            if role == "student":
+                email_sent, email_message = email_manager.send_welcome_email(email)
+            if email_sent:
+                messagebox.showinfo("Success", message + "\nWelcome email sent.")
+            else:
+                messagebox.showwarning(
+                    "User Added, Email Failed",
+                    message + "\n\nHowever, the welcome email could not be sent."
+                )
 
-        # success, message = database.add_user(user_id, email, password,
-        #                                       policy_type, role)
-
-        # if success:
-        #   messagebox.showinfo("Success", message)
-        success, message = database.add_user(user_id, email, password,
-                                             policy_type, role)
-
-        # Clear the form so it is ready for the next new user.
-        self.new_user_id_entry.delete(0, tk.END)
-        self.new_email_entry.delete(0, tk.END)
-        self.new_password_entry.delete(0, tk.END)
+            # Clear the form so it is ready for the next new user.
+            self.new_user_id_entry.delete(0, tk.END)
+            self.new_email_entry.delete(0, tk.END)
+            self.new_password_entry.delete(0, tk.END)
 
             # Update the dashboard numbers and the email list,
             # since we just added a new row to the database.
-        self.refresh_dashboard()
-        self.refresh_student_list()
-        # else:
-        messagebox.showerror("Could Not Add User", message)
+            self.refresh_dashboard()
+            self.refresh_student_list()
+        else:
+            messagebox.showerror("Could Not Add User", message)
 
     def show_not_ready(self):
         # A shared message for every button we have not built yet
         # (Send, Inbox, Send Item, Refresh).
         messagebox.showinfo("Coming Soon",
                              "This feature will be added in a later step.")
-
-
-# Test Run
-if __name__ == "__main__":
-    database.create_database()
-
-    def logout():
-        print("Logout button was pressed.")
-
-    root = tk.Tk()
-    root.title("Medibank AI-Chatbot - Admin Panel")
-    root.geometry("950x800")
-    root.minsize(700, 500)   # stops the screen shrinking so small that
-                             # nothing fits, even with the scrollbar
-    root.configure(bg="white")
-
-    admin_page = AdminPanel(root, on_logout=logout)
-    admin_page.pack(fill="both", expand=True)
-
-    root.mainloop()

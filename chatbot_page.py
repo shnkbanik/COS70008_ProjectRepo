@@ -5,7 +5,7 @@
 # Currently, UNDER DEVELOPMENT
 
 import tkinter as tk
-# import config
+import config
 
 
 class ChatbotPage(tk.Frame):
@@ -23,7 +23,7 @@ class ChatbotPage(tk.Frame):
         top_bar = tk.Frame(self, bg="white", bd=1, relief="solid")
         top_bar.pack(fill="x")
 
-        tk.Label(top_bar, text="Medibank AI-Chatbot",
+        tk.Label(top_bar, text=config.APP_TITLE,
                  font=("Arial", 14, "bold"), bg="white").pack(
             side="left", padx=10, pady=8)
 
@@ -41,18 +41,3 @@ class ChatbotPage(tk.Frame):
         tk.Label(center, text="The chatbot will develop on next week",
                  font=("Arial", 11, "italic"), bg="white", fg="gray").pack()
 
-
-if __name__ == "__main__":
-    def logout():
-        print("Logout button was pressed.")
-
-
-    root = tk.Tk()
-    root.title("Medibank AI-Chatbot - Chatbot Page")
-    root.geometry("950x800")
-    root.configure(bg="white")
-
-    chatbot_page = ChatbotPage(root, user_id="123456", on_logout=logout)
-    chatbot_page.pack(fill="both", expand=True)
-
-    root.mainloop()
