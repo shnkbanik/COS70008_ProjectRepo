@@ -1,80 +1,60 @@
-# email_manager.py
-# Functionality:
-# Bulk Email Send Functionality
-# Scheduled Email Send Functionality
-# New User Email Send Functionality
-# InActive User Email Send Functionality
-
 import smtplib
 import ssl
-from email.mime.text import MIMEText
-import certifi
-import config
-import database
 import threading
 import time
 from datetime import datetime
+from email.mime.text import MIMEText
+
+import certifi
+
+import config
+import database
+
 
 def send_email(to_email, subject, body):
-    """
-    Send email to a address
-    Return (success, message):
-    success -> True or False
-    message -> a short text explaining what happened
-    """
-    # Build the email itself: who it's from, who it's to, subject, body.
+    """Send one email. Returns (success, message)."""
     message = MIMEText(body)
     message["Subject"] = subject
     message["From"] = config.SENDER_EMAIL
     message["To"] = to_email
 
     try:
-        # create secure encrypted connection setting with certifi security certificate
-        secure_context = ssl.create_default_context(cafile=certifi.where())
-
-        # SMTP_SSL
+        context = ssl.create_default_context(cafile=certifi.where())
         server = smtplib.SMTP_SSL(config.SMTP_SERVER, config.SMTP_PORT,
-                                   context=secure_context, timeout=15) # Timeout after 15 secounds
-        server.login(config.SENDER_EMAIL, config.SENDER_APP_PASSWORD) # Sender ACC login process
-        server.send_message(message) # send email
-        server.quit() # Close the connection
-
+                                  context=context, timeout=15)  # give up after 15 seconds
+        server.login(config.SENDER_EMAIL, config.SENDER_APP_PASSWORD)
+        server.send_message(message)
+        server.quit()
         return True, "Email sent to " + to_email
 
     except Exception as error:
-        # unsuccessful email send
         return False, "Could not send email to " + to_email + ". Reason: " + str(error)
 
+
 def send_bulk_email(email_list, subject, body):
-    """
-    Send email to multiple addresses
-    Return:
-    * how many succeeded
-    * how many failed
-    """
+    """Send the same email to a list of addresses. Returns (sent, failed)."""
     success_count = 0
     fail_count = 0
 
     for email_address in email_list:
         success, message = send_email(email_address, subject, body)
-        print(message) # Print progress in the terminal
+        print(message)
         if success:
-            success_count = success_count + 1
+            success_count += 1
         else:
-            fail_count = fail_count + 1
+            fail_count += 1
+
     return success_count, fail_count
+
+
 def send_welcome_email(student_email):
-    """
-    Send automatic welcome email to user after registration from admin panel
-    """
+    """Welcome email sent when the admin adds a new student."""
     subject = "Welcome to Medibank OSHC"
     body = (
         "Hello,\n\n"
         "Your Medibank OSHC account has been created.\n"
-        "Now, we are providing an advanced AI-Chatbot to our users."
-        "Users experience the personal AI assistant by getting specific"
-        "answers to the queries. You can log in to the system and"
-        "ask questions about your OSHC policy \n\n"
+        "We now offer an AI chatbot that gives specific answers to your "
+        "questions. Log in and ask anything about your OSHC policy.\n\n"
         "Thank you,\n"
         "Medibank"
     )
@@ -82,81 +62,65 @@ def send_welcome_email(student_email):
 
 
 def send_startup_email_to_all_students():
-    """
-    Send update email to students in the database.
-    Send email when the app first starts
-    Please set SEND_ON_STARTUP = True.
-    """
+    """Update email to every student. Only runs if SEND_ON_STARTUP is True in config."""
     students = database.get_all_students()
 
-    # students looks like [("id1", "email1"), ("id2", "email2")]
-    # We only need the email part for sending.
+    # each item is (user_id, email), we only need the email
     email_list = []
     for user_id, email in students:
         email_list.append(email)
-    subject = "Medibank OHSC - New Update for APP Available"
+
+    subject = "Medibank OSHC - New Update Available"
     body = (
         "Hello,\n\n"
-        "The Medibank OSHC has a new update available in the APP."
-        "Now, we are providing an advanced AI-Chatbot to our users."
-        "Users experience the personal AI assistant by getting specific"
-        "answers to the queries. Please log in and try it out.\n\n"
+        "There is a new update in the Medibank OSHC app. "
+        "We now offer an AI chatbot that gives specific answers to your "
+        "questions. Please log in and try it out.\n\n"
         "Thank you,\n"
         "Medibank"
     )
-    success_count, fail_count = send_bulk_email(email_list, subject, body)
-    print("Startup email finished. Sent:", success_count, "Failed:", fail_count)
+    sent, failed = send_bulk_email(email_list, subject, body)
+    print("Startup email finished. Sent:", sent, "Failed:", failed)
 
 
 def send_daily_reminder_emails():
-    """
-    Send reminder email to registered students who has not logged in yet.
-    This send automatically by scheduler
-    time set in config.py (DAILY_EMAIL_HOUR and DAILY_EMAIL_MINUTE).
-    """
+    """Reminder for students who have not logged in. Called by the scheduler."""
     email_list = database.get_students_not_logged_in()
+
     subject = "Don't forget - Medibank AI-Chatbot is here to help"
     body = (
         "Hello,\n\n"
-        "Now, we are providing an advanced AI-Chatbot to our users."
-        "Users experience the personal AI assistant by getting specific"
-        "answers to the queries. Please log in and try it out.\n\n"
+        "We now offer an AI chatbot that gives specific answers to your "
+        "questions. Please log in and try it out.\n\n"
         "Thank you,\n"
         "Medibank"
     )
-    success_count, fail_count = send_bulk_email(email_list, subject, body)
-    print("Daily reminder finished. Sent:", success_count, "Failed:", fail_count)
+    sent, failed = send_bulk_email(email_list, subject, body)
+    print("Daily reminder finished. Sent:", sent, "Failed:", failed)
+
 
 # Scheduler
 
 def start_daily_email_scheduler():
-    """
-    Starts the background clock-checking loop when the app starts.
-    This function starts the run_scheduler_loop() function
-    """
-    background_thread = threading.Thread(target=run_scheduler_loop, daemon=True)
-    background_thread.start()
+    """Start the reminder scheduler in a background thread."""
+    thread = threading.Thread(target=run_scheduler_loop, daemon=True)
+    thread.start()
 
 
 def run_scheduler_loop():
-    """
-    This function check the scheduled date and time of sending reminder email
-    and check if email has been sent or not.
-    """
+    """Check the clock every minute and send the daily reminder once at the set time."""
     last_sent_date = None
 
     while True:
         now = datetime.now()
-        today_text = now.strftime("%Y-%m-%d")
+        today = now.strftime("%Y-%m-%d")
 
-        target_hour = config.DAILY_EMAIL_HOUR
-        target_minute = config.DAILY_EMAIL_MINUTE
+        time_matches = (now.hour == config.DAILY_EMAIL_HOUR
+                        and now.minute == config.DAILY_EMAIL_MINUTE)
 
-        already_sent_today = (last_sent_date == today_text)
-
-        if now.hour == target_hour and now.minute == target_minute and not already_sent_today:
-            print("Scheduler: it is time, sending daily reminder emails now...")
+        if time_matches and last_sent_date != today:
+            print("Scheduler: sending daily reminder emails now...")
             send_daily_reminder_emails()
-            last_sent_date = today_text
+            last_sent_date = today
 
         time.sleep(60)
