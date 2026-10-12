@@ -52,7 +52,7 @@ class App(tk.Tk):
         self.current_frame = frame
         frame.grid(row=0, column=0, sticky="nsew")
 
-    # ---------- Screens ----------
+    # Screens
 
     def show_login(self):
         self.title(config.APP_TITLE)
