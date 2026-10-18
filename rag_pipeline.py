@@ -240,11 +240,7 @@ def rebuild_index():
     with _load_lock:
         _faiss_index, _chunks = build_index()
 
-
-# =====================================================================
-# Step 5: Searching
-# =====================================================================
-
+# Searching
 def get_cover_type_of_file(file_name):
     """
     Decides which cover type a document belongs to, using its FILE NAME.

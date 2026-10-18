@@ -24,13 +24,13 @@ SMTP_PORT = 465
 # Automatic Email Settings on each Deployment / RUN
 # True = system will send email to all students when run (start) the application.
 # False = system will not send email to all students when run (start) the application.
-SEND_ON_STARTUP = False
+SEND_ON_STARTUP = True
 
 # Scheduled Email Settings
 # 24-HOUR format (0 to 23 for the hour).
 # Example: HOUR = 21, MINUTE = 30 means the check happens at 9:30 PM.
-DAILY_EMAIL_HOUR = 21
-DAILY_EMAIL_MINUTE = 0
+DAILY_EMAIL_HOUR = 18
+DAILY_EMAIL_MINUTE = 53
 
 # Chatbot (RAG + LLM) Settings
 # Folder that holds the Medibank OSHC documents
